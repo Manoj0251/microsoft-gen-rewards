@@ -1,0 +1,4 @@
+v1: initial commit
+    1. launch browser and search random words in dictonary
+    2. every search reads the changes in the points and after 5 results with same  points exits the execution and waits for 300 seconds
+    3. run the search for 15 times with a interval of 300 seconds
