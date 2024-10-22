@@ -1,0 +1,5 @@
+pyyaml>=3.11
+python-gitlab==2.8.0
+nltk
+selenium
+webdriver-manager
