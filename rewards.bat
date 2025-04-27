@@ -13,7 +13,7 @@ set delay_seconds=300
 REM Loop for the specified number of times
 for /l %%i in (1,1,%total_runs%) do (
     echo Running command, iteration %%i
-    %PYTHON_HOME% ./launch.py
+    %PYTHON_HOME% %~dp0/launch.py
     set ret_val=!ERRORLEVEL!
     echo Python script returned !ret_val!
 
