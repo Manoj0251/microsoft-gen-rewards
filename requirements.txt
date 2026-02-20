@@ -1,5 +1,5 @@
 pyyaml>=3.11
 python-gitlab==2.8.0
-nltk
-selenium
-webdriver-manager
+nltk >=3.9.1
+selenium >=4.35.0
+webdriver-manager >=4.0.2

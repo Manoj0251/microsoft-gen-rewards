@@ -4,7 +4,7 @@ import nltk
 from selenium import webdriver
 from selenium.webdriver import Keys
 from selenium.webdriver.common.by import By
-from selenium.webdriver.edge.service import Service as EdgeService
+from selenium.webdriver.edge.service import Service
 from selenium.webdriver.edge.options import Options
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 import random
@@ -24,11 +24,18 @@ def getCount(driver):
         print("Executing Search")
         return count
 
-edge_options = Options()
+
 # edge_options.add_argument('--headless')
-driver = webdriver.Edge(service=EdgeService(EdgeChromiumDriverManager().install()))
+# driver = webdriver.Edge(service=EdgeService(EdgeChromiumDriverManager().install()))
 # , options=edge_options
 # driver.capabilities("--enable-chrome-browser-cloud-management")
+
+
+edge_options = Options()
+edge_options.add_argument("--start-maximized")
+service = Service("./msedgedriver.exe")
+driver = webdriver.Edge(service=service, options=edge_options)
+
 driver.maximize_window()
 count = getCount(driver)
 if(count == 1):
