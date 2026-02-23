@@ -31,9 +31,11 @@ def getCount(driver):
 # driver.capabilities("--enable-chrome-browser-cloud-management")
 
 
+from pathlib import Path
 edge_options = Options()
 edge_options.add_argument("--start-maximized")
-service = Service("./msedgedriver.exe")
+driver_path = Path(__file__).resolve().parent / "msedgedriver.exe"
+service = Service(str(driver_path))
 driver = webdriver.Edge(service=service, options=edge_options)
 
 driver.maximize_window()
