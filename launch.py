@@ -10,22 +10,60 @@ from rewards_completer_v2 import BingRewardsAutomator
 import random
 from nltk.corpus import words
 from pathlib import Path
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 
-def getCount(driver):
-    val_totalRewards = 150
-    count = 5
+def getCount(driver, timeout=15):
+    """Check current daily rewards value and decide how many searches to run.
+
+    This attaches the existing webdriver to BingRewardsAutomator if possible so
+    the automator can reuse the same browser session.
+    Returns an integer count: 5 when no searches needed, 1 when searches should run.
+    """
+    val_total_rewards = 150
+    default_count = 5
+
     driver.get("https://rewards.bing.com/pointsbreakdown")
-    sleep(10)
-    val_dailyRewards = int(driver.find_element(By.XPATH, "//a[contains(text(),'PC search')]/../../..//*[@class='pointsDetail c-subheading-3 ng-binding']/b").get_attribute("textContent"))
-    print(val_dailyRewards)
-    if val_totalRewards == val_dailyRewards:
-        return count
-    else:
-        count = 1
-        print("Executing Search")
-        automator = BingRewardsAutomator()
+    try:
+        # Wait for the specific element to appear instead of sleeping a fixed time
+        xpath = "//a[contains(text(),'PC search')]/../../..//*[@class='pointsDetail c-subheading-3 ng-binding']/b"
+        el = WebDriverWait(driver, timeout).until(EC.presence_of_element_located((By.XPATH, xpath)))
+        text = el.get_attribute("textContent") or "0"
+        try:
+            val_daily_rewards = int(text.strip())
+        except ValueError:
+            print(f"Could not parse daily reward value from '{text}'. Assuming 0.")
+            val_daily_rewards = 0
+    except TimeoutException:
+        print("Timed out waiting for rewards page element; assuming 0 daily rewards.")
+        val_daily_rewards = 0
+
+    print(f"Daily rewards: {val_daily_rewards}")
+
+    # Create automator and attach the driver if possible (works whether or not the class accepts driver in ctor)
+    automator = BingRewardsAutomator()
+    # prefer a setter if available, otherwise set attribute directly
+    try:
+        if hasattr(automator, "set_driver"):
+            automator.set_driver(driver)
+        elif hasattr(automator, "driver"):
+            automator.driver = driver
+    except Exception:
+        # If automator doesn't accept attaching driver, continue anyway.
+        print("Could not attach driver to BingRewardsAutomator instance; proceeding without attaching.")
+
+    # Run automator to complete any automated tasks it encapsulates
+    try:
         automator.run()
-        return count
+    except Exception as e:
+        print(f"BingRewardsAutomator.run() raised an exception: {e}")
+
+    if val_daily_rewards == val_total_rewards:
+        return default_count
+    else:
+        print("Executing Search")
+        return 1
 
 if __name__ == "__main__":
     edge_options = Options()

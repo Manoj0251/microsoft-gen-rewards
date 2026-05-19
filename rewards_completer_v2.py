@@ -10,6 +10,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from pathlib import Path
 import random
+import sys
+import re
 
 class BingRewardsAutomator:
     def __init__(self):
@@ -151,15 +153,20 @@ class BingRewardsAutomator:
             ("lyrics", lambda: self._extract_lyrics_search(aria_label)),
             ("weather", lambda: self._extract_weather_search(aria_label)),
             ("recipe", lambda: self._extract_recipe_search(aria_label)),
-            ("how to", lambda: self._extract_how_to_search(aria_label)),
-            ("best", lambda: self._extract_best_search(aria_label)),
-            ("find", lambda: self._extract_find_search(aria_label)),
+            # ("how to", lambda: self._extract_how_to_search(aria_label)),
+            # ("best", lambda: self._extract_best_search(aria_label)),
+            # ("find", lambda: self._extract_find_search(aria_label)),
             ("savings", lambda: self._extract_savings_search(aria_label)),
             ("flights", lambda: self._extract_flights_search(aria_label)),
             ("parking", lambda: self._extract_parking_search(aria_label)),
             ("flower", lambda: self._extract_flower_search(aria_label)),
             ("streaming", lambda: self._extract_streaming_search(aria_label)),
             ("events", lambda: self._extract_events_search(aria_label)),
+            ("recipe", lambda: self._extract_recipe_search(aria_label)),
+            ("100 points", lambda: self._extract_100_points_search(aria_label)),
+            ("DIY kits and craft supplies", lambda: self._extract_diy_search(aria_label)),
+            ("cell phone plans", lambda: self._extract_cellPlans_search(aria_label)),
+
         ]
         
         for trigger, extractor in search_patterns:
@@ -167,7 +174,15 @@ class BingRewardsAutomator:
                 keyword = extractor()
                 if keyword:
                     return keyword
-        
+
+        # If no pattern matched, try to extract text between 'Bing' and 'Earn'
+        try:
+            bing_extract = self._extract_bing_earn_search(aria_label)
+            if bing_extract:
+                return bing_extract
+        except Exception:
+            pass
+
         # Fallback: extract text between commas (description)
         fallback = self._extract_fallback_search(aria_label)
         if fallback:
@@ -175,7 +190,7 @@ class BingRewardsAutomator:
         
         # No patterns matched - return special value to indicate "just click, no search"
         return "__JUST_CLICK__"
-    
+
     def _extract_lyrics_search(self, text):
         """Extract lyrics search: 'lyrics of your favorite X' -> 'lyrics of [Popular Song]'"""
         # Example: "Learn song lyrics" -> search "lyrics of Titanic"
@@ -183,7 +198,67 @@ class BingRewardsAutomator:
             popular_songs = ["Titanic", "Bohemian Rhapsody", "Imagine", "Let It Be", "Hotel California"]
             return f"lyrics of {random.choice(popular_songs)}"
         return None
-    
+    def _extract_cellPlans_search(self, text):
+        """Extract cell phone plans search: 'cell phone plans for X' -> 'cell phone plans for [carrier]'"""
+        # Example: "Find cell phone plans" -> search "cell phone plans for Verizon"
+        if "cell phone plans" in text.lower():
+            carriers = ["Verizon", "AT&T", "T-Mobile", "Sprint"]
+            return f"cell phone plans for {random.choice(carriers)}"
+        return None
+    def _extract_diy_search(self, text):
+        """Extract lyrics search: 'lyrics of your favorite X' -> 'lyrics of [Popular Song]'"""
+        # Example: "Learn song lyrics" -> search "lyrics of Titanic"
+        if "Crafts" in text.lower():
+            diy_list = ["Home Decor", "Car Seat", "Painting", "Garden"]
+            return f"DIY Kits and Craft Supplies for {random.choice(diy_list)}"
+        return None
+
+    def _extract_recipe_search(self, text):
+        """Extract recipe search: 'recipe for X' -> 'recipe [dish]'"""
+        if "recipe" in text.lower():
+            recipes = ["chocolate cake", "pasta carbonara", "chicken soup", "tiramisu"]
+            return f"recipe {random.choice(recipes)}"
+        return None
+    def _extract_100_points_search(self, text):
+        """Extract 100 points search: '100 points for X' -> '100 points for [reward]'"""
+        # If the aria text indicates a 100-points task, detect progress like '47/100'
+        if "100 points" in text.lower():
+            # Look for patterns like '47/100' to get how many already completed
+            m = re.search(r"(\d{1,3})\s*/\s*100", text)
+            if m:
+                try:
+                    completed = int(m.group(1))
+                except Exception:
+                    completed = 0
+                remaining = max(0, 100 - completed)
+            else:
+                # No progress indicator found -> assume full 100 remaining
+                remaining = 100
+
+            # If nothing remains, nothing to do
+            if remaining <= 0:
+                return None
+
+            # Build a list of simple random keywords to run until completion
+            word_pool = [
+                "alpha","bravo","charlie","delta","echo","foxtrot","golf","hotel",
+                "india","juliet","kilo","lima","mango","nectar","orange","papaya",
+                "quartz","robot","sushi","taco","umbrella","violet","whiskey","xray",
+                "yankee","zulu","coffee","cookie","bacon","pasta","pizza","chocolate",
+                "banana","apple","garden","travel","music","movie","recipe","news"
+            ]
+
+            # Generate 'remaining' keywords (may contain duplicates)
+            keywords = [random.choice(word_pool) for _ in range(remaining)]
+
+            # Return structured info so caller can run the required number of searches
+            return {
+                "type": "100points",
+                "keywords": keywords,
+                "remaining": remaining,
+            }
+
+        return None
     def _extract_weather_search(self, text):
         """Extract weather search: 'weather for X' -> 'weather [city]'"""
         if "weather" in text.lower():
@@ -274,6 +349,50 @@ class BingRewardsAutomator:
             words = description.split()[:4]
             return " ".join(words) if words else None
         return None
+
+    def _extract_bing_earn_search(self, text):
+        """Extract substring after 'Bing' and before 'Earn' if present.
+
+        Examples:
+        - "Search on Bing to find cell phone plans that fit your lifestyle, Earn 10 points" ->
+          "find cell phone plans that fit your lifestyle"
+        - Returns None when 'bing' not found or extraction yields empty string.
+        """
+        if not text:
+            return None
+
+        # Find 'earn' first to know the slice end
+        m_earn = re.search(r"\bearn\b", text, re.IGNORECASE)
+        end = m_earn.start() if m_earn else len(text)
+
+        # Find the last occurrence of 'bing' before the 'earn' position
+        matches = list(re.finditer(r"\bbing\b", text, re.IGNORECASE))
+        if not matches:
+            return None
+
+        # pick the last bing whose start is < end
+        last_bing = None
+        for mm in matches:
+            if mm.start() < end:
+                last_bing = mm
+            else:
+                break
+
+        if not last_bing:
+            return None
+
+        start = last_bing.end()
+
+        extracted = text[start:end]
+
+        # Remove common leading/trailing separators and zero-width spaces
+        extracted = re.sub(r"^[\s\,\:\;\-\.\u200B]+", "", extracted)
+        extracted = re.sub(r"[\s\,\:\;\-\.\u200B]+$", "", extracted)
+
+        # Remove leading prepositions like 'to', 'for', 'on'
+        extracted = re.sub(r'^(to|for|on)\s+', '', extracted, flags=re.IGNORECASE)
+
+        return extracted.strip() if extracted else None
     
     def perform_search_task(self, search_count=3, search_keywords=None):
         """Perform search-based rewards"""
@@ -289,13 +408,33 @@ class BingRewardsAutomator:
                 from nltk.corpus import words as nltk_words
                 keywords_to_use = [random.choice(nltk_words.words()) for _ in range(search_count)]
             
-            for i in range(min(search_count, len(keywords_to_use))):
+            # Run exactly `search_count` searches. If we have fewer provided keywords than
+            # the count, cycle through them. If keywords list is empty, fall back to random words.
+            if not keywords_to_use:
+                keywords_to_use = None
+
+            for i in range(search_count):
                 try:
                     if not self.driver:
                         print("[⚠] Browser disconnected, cannot continue searches")
                         break
-                    
-                    search_term = keywords_to_use[i] if i < len(keywords_to_use) else random.choice(keywords_to_use)
+                    # Choose keyword for this iteration
+                    if keywords_to_use is None:
+                        # No provided keywords -> pick a random word via nltk (slow) or small pool
+                        try:
+                            import nltk
+                            nltk.download('words', quiet=True)
+                            from nltk.corpus import words as nltk_words
+                            search_term = random.choice(nltk_words.words())
+                        except Exception:
+                            small_pool = ["garden","music","news","recipe","movie","travel","coffee","pizza","chocolate","apple"]
+                            search_term = random.choice(small_pool)
+                    else:
+                        if isinstance(keywords_to_use, list):
+                            search_term = keywords_to_use[i % len(keywords_to_use)]
+                        else:
+                            # single string provided
+                            search_term = keywords_to_use
                     search_input = self.wait_for_element(By.NAME, "q", timeout=10)
                     
                     if search_input:
@@ -392,8 +531,19 @@ class BingRewardsAutomator:
                     if search_keywords == "__JUST_CLICK__":
                         print(f"    [→] No search pattern matched - just clicking element")
                         sleep(8)  # Wait for page action to complete
+                    elif isinstance(search_keywords, dict) and search_keywords.get("type") == "100points":
+                        # Structured instruction: run many searches until 100/100
+                        remaining = search_keywords.get("remaining", 0)
+                        keywords = search_keywords.get("keywords", [])
+                        print(f"    [→] 100-points task detected: need {remaining} more searches")
+                        if remaining > 0:
+                            # Perform the required number of searches using provided keywords
+                            self.perform_search_task(search_count=remaining, search_keywords=keywords)
+                        else:
+                            print(f"    [→] No remaining searches for 100-point task")
                     elif search_keywords:
                         print(f"    [→] Extracted search term: {search_keywords}")
+
                         self.perform_search_task(search_count=2, search_keywords=search_keywords)
                     else:
                         print(f"    [→] No keywords extracted - performing random searches")
