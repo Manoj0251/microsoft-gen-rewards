@@ -73,7 +73,8 @@ if __name__ == "__main__":
     driver = webdriver.Edge(service=service, options=edge_options)
 
     driver.maximize_window()
-    count = getCount(driver)
+    # count = getCount(driver)
+    count = 1
     if count == 1:
         driver.get("https://www.bing.com/?form=ML2XQD&OCID=ML2XQD&PUBL=RewardsDO&CREA=ML2XQD&toWww=1&redig=30BC9B06B18140EF83D3695DA99B5D4F")
         search_query = "Your search query here"
